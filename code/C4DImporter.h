@@ -47,10 +47,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "BaseImporter.h"
 #include "LogAux.h"
 
+#include <set>
+
 struct aiImporterDesc;
 
 namespace _melange_ {
 	class BaseObject; // c4d_file.h
+	class PolygonObject;
+	class BaseMaterial;
 }
 
 namespace Assimp	{
@@ -95,10 +99,16 @@ protected:
 
 private:
 
+	void ReadMaterials(_melange_::BaseMaterial* mat);
 	void RecurseHierarchy(_melange_::BaseObject* object, aiNode* parent);
 	aiMesh* ReadMesh(_melange_::BaseObject* object);
+	unsigned int ResolveMaterial(_melange_::PolygonObject* obj);
 
 	std::vector<aiMesh*> meshes;
+	std::vector<aiMaterial*> materials;
+
+	typedef std::map<_melange_::BaseMaterial*, unsigned int> MaterialMap;
+	MaterialMap material_mapping;
 
 }; // !class C4DImporter
 

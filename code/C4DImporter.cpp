@@ -142,7 +142,7 @@ void C4DImporter::InternReadFile( const std::string& pFile,
 	f.SetMemoryReadMode(&mBuffer[0], file_size);
 
 	// open document first
-	BaseDocument* doc = LoadDocument(f, SCENEFILTER_OBJECTS);
+	BaseDocument* doc = LoadDocument(f, SCENEFILTER_OBJECTS | SCENEFILTER_MATERIALS);
 	if(doc == NULL) {
 		ThrowException("failed to read document " + pFile);
 	}
@@ -167,10 +167,70 @@ void C4DImporter::InternReadFile( const std::string& pFile,
 	pScene->mMeshes = new aiMesh*[pScene->mNumMeshes]();
 	std::copy(meshes.begin(), meshes.end(), pScene->mMeshes);
 
-	// default material
-	pScene->mNumMaterials = 1;
-	pScene->mMaterials = new aiMaterial*[1];
-	pScene->mMaterials[0] = new aiMaterial();
+	// copy materials over, adding a default material if necessary
+	const unsigned int mat_count = static_cast<unsigned int>(materials.size());
+	BOOST_FOREACH(aiMesh* mesh, meshes) {
+		ai_assert(mesh->mMaterialIndex <= mat_count);
+		if(mesh->mMaterialIndex >= mat_count) {
+
+			ScopeGuard<aiMaterial> def_material(new aiMaterial());
+			const aiString name(AI_DEFAULT_MATERIAL_NAME);
+			def_material->AddProperty(&name, AI_MATKEY_NAME);
+
+			materials.push_back(def_material.dismiss());
+			break;
+		}
+	}
+
+	pScene->mNumMaterials = static_cast<unsigned int>(materials.size());
+	pScene->mMaterials = new aiMaterial*[pScene->mNumMaterials]();
+	std::copy(materials.begin(), materials.end(), pScene->mMaterials);
+}
+
+
+// ------------------------------------------------------------------------------------------------
+void C4DImporter::ReadMaterials(_melange_::BaseMaterial* mat)
+{
+	// based on Melange sample code
+	while (mat)
+	{
+		const String& name = mat->GetName();
+		if (mat->GetType() == Mmaterial)
+		{
+			aiMaterial* out = new aiMaterial();
+			materials.push_back(out);
+
+			aiString ai_name;
+			name.GetCString(ai_name.data, MAXLEN-1);
+			out->AddProperty(&ai_name, AI_MATKEY_NAME);
+
+			Material& m = dynamic_cast<Material&>(*mat);
+
+			if (m.GetChannelState(CHANNEL_COLOR))
+			{
+				GeData data;
+				mat->GetParameter(MATERIAL_COLOR_COLOR, data);
+				Vector color = data.GetVector();
+				mat->GetParameter(MATERIAL_COLOR_BRIGHTNESS, data);
+				const Real brightness = data.GetReal();
+
+				color *= brightness;
+
+				aiVector3D v;
+				v.x = color.x;
+				v.y = color.y;
+				v.z = color.z;
+				out->AddProperty(&v, 1, AI_MATKEY_COLOR_DIFFUSE);
+			}
+
+			// TODO: handle textures and more material properties
+		}
+		else
+		{
+			LogWarn("ignoring plugin material");
+		}
+		mat = mat->GetNext();
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -242,18 +302,28 @@ void C4DImporter::RecurseHierarchy(BaseObject* object, aiNode* parent)
 	std::copy(nodes.begin(), nodes.end(), parent->mChildren);
 }
 
+
 // ------------------------------------------------------------------------------------------------
 aiMesh* C4DImporter::ReadMesh(BaseObject* object)
 {
 	assert(object != NULL && object->GetType() == Opolygon);
 	
 	// based on Melange sample code
-
 	PolygonObject* const polyObject = dynamic_cast<PolygonObject*>(object);
+	ai_assert(polyObject != NULL);
+
 	const LONG pointCount = polyObject->GetPointCount();
 	const LONG polyCount = polyObject->GetPolygonCount();
+	if(!polyObject || !pointCount) {
+		LogWarn("ignoring mesh with zero vertices or faces");
+		return NULL;
+	}
+
 	const Vector* points = polyObject->GetPointR();
+	ai_assert(points != NULL);
+
 	const CPolygon* polys = polyObject->GetPolygonR();
+	ai_assert(polys != NULL);
 
 	ScopeGuard<aiMesh> mesh(new aiMesh());
 	mesh->mNumFaces = static_cast<unsigned int>(polyCount);
@@ -277,6 +347,8 @@ aiMesh* C4DImporter::ReadMesh(BaseObject* object)
 		}
 	}
 
+	ai_assert(vcount > 0);
+
 	mesh->mNumVertices = vcount;
 	aiVector3D* verts = mesh->mVertices = new aiVector3D[mesh->mNumVertices];
 	unsigned int n = 0;
@@ -284,18 +356,21 @@ aiMesh* C4DImporter::ReadMesh(BaseObject* object)
 	// copy vertices over and populate faces
 	for (LONG i = 0; i < polyCount; ++i, ++face)
 	{
+		ai_assert(polys[i].a < pointCount && polys[i].a >= 0);
 		const Vector& pointA = points[polys[i].a];
 		verts->x = pointA.x;
 		verts->y = pointA.y;
 		verts->z = pointA.z;
 		++verts;
 
+		ai_assert(polys[i].b < pointCount && polys[i].b >= 0);
 		const Vector& pointB = points[polys[i].b];
 		verts->x = pointB.x;
 		verts->y = pointB.y;
 		verts->z = pointB.z;
 		++verts;
 
+		ai_assert(polys[i].c < pointCount && polys[i].c >= 0);
 		const Vector& pointC = points[polys[i].c];
 		verts->x = pointC.x;
 		verts->y = pointC.y;
@@ -305,6 +380,8 @@ aiMesh* C4DImporter::ReadMesh(BaseObject* object)
 		// TODO: do we also need to handle lines or points with similar checks?
 		if (polys[i].c != polys[i].d)
 		{
+			ai_assert(polys[i].d < pointCount && polys[i].d >= 0);
+
 			face->mNumIndices = 4;
 			mesh->mPrimitiveTypes |= aiPrimitiveType_POLYGON;
 			const Vector& pointD = points[polys[i].d];
@@ -322,6 +399,33 @@ aiMesh* C4DImporter::ReadMesh(BaseObject* object)
 		}
 	}
 
+	mesh->mMaterialIndex = ResolveMaterial(polyObject);
 	return mesh.dismiss();
 }
 
+
+// ------------------------------------------------------------------------------------------------
+unsigned int C4DImporter::ResolveMaterial(PolygonObject* obj)
+{
+	ai_assert(obj != NULL);
+
+	const unsigned int mat_count = static_cast<unsigned int>(materials.size());
+
+	BaseTag* tag = obj->GetTag(Ttexture);
+	if(tag == NULL) {
+		return mat_count;
+	}
+
+	TextureTag& ttag = dynamic_cast<TextureTag&>(*tag);
+
+	BaseMaterial* const mat = ttag.GetMaterial();
+	assert(mat != NULL);
+
+	const MaterialMap::const_iterator it = material_mapping.find(mat);
+	if(it == material_mapping.end()) {
+		return mat_count;
+	}
+
+	ai_assert((*it).second < mat_count);
+	return (*it).second;
+}
