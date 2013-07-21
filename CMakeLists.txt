@@ -159,10 +159,28 @@ SET ( ASSIMP_BUILD_NONFREE_C4D_IMPORTER OFF CACHE BOOL
 	
 IF (ASSIMP_BUILD_NONFREE_C4D_IMPORTER)
 	IF ( MSVC )
-		# todo: switch on version number
 		SET(C4D_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}/contrib/Melange/_melange/includes")
+		
+		# pick the correct prebuilt library
+		IF(MSVC11)
+			SET(C4D_LIB_POSTFIX "2012md")
+		ELSEIF(MSVC10)
+			SET(C4D_LIB_POSTFIX "2010md")
+		ELSEIF(MSVC90)
+			SET(C4D_LIB_POSTFIX "2008md")
+		ELSE()
+			MESSAGE( FATAL_ERROR 
+				"C4D is currently only supported with MSVC 9, 10, 11"
+			)
+		ENDIF()
+		
+		SET(C4D_LIB_BASE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/contrib/Melange/_melange/lib/WIN")
+		
+		SET(C4D_DEBUG_LIBRARY "${C4D_LIB_BASE_PATH}/debug/_melange_lib_${C4D_LIB_POSTFIX}.lib")
+		SET(C4D_RELEASE_LIBRARY "${C4D_LIB_BASE_PATH}/release/_melange_lib_${C4D_LIB_POSTFIX}.lib")
+		
 		# winsock and winmm are necessary dependencies of melange (this is undocumented, but true.)
-		SET(C4D_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/contrib/Melange/_melange/lib/WIN/debug/_melange_lib_2012md.lib" WSock32.lib Winmm.lib)
+		SET(C4D_EXTRA_LIBRARIES WSock32.lib Winmm.lib)
 	ELSE ()
 		MESSAGE( FATAL_ERROR 
 			"C4D is currently only available on Windows with melange SDK installed in contrib/Melange"
