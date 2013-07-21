@@ -167,6 +167,8 @@ corresponding preprocessor flag to selectively disable formats.
 #   include "FBXImporter.h"
 #endif 
 
+#   include "C4DImporter.h"
+
 namespace Assimp {
 
 // ------------------------------------------------------------------------------------------------
@@ -291,6 +293,8 @@ void GetImporterInstanceList(std::vector< BaseImporter* >& out)
 #if ( !defined ASSIMP_BUILD_NO_FBX_IMPORTER )
 	out.push_back( new FBXImporter() );
 #endif
+
+	out.push_back( new C4DImporter() );
 }
 
 }

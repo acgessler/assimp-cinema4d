@@ -152,6 +152,26 @@ ENDIF ( ASSIMP_BUILD_COMPILER STREQUAL "")
 MARK_AS_ADVANCED ( ASSIMP_BUILD_ARCHITECTURE ASSIMP_BUILD_COMPILER )
 
 
+
+SET ( ASSIMP_BUILD_NONFREE_C4D_IMPORTER OFF CACHE BOOL
+	"Build the C4D importer, which relies on the non-free Melange SDK." 
+)
+	
+IF (ASSIMP_BUILD_NONFREE_C4D_IMPORTER)
+	IF ( MSVC )
+		# todo: switch on version number
+		SET(C4D_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}/contrib/Melange/_melange/includes")
+		# winsock and winmm are necessary dependencies of melange (this is undocumented, but true.)
+		SET(C4D_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/contrib/Melange/_melange/lib/WIN/debug/_melange_lib_2012md.lib" WSock32.lib Winmm.lib)
+	ELSE ()
+		MESSAGE( FATAL_ERROR 
+			"C4D is currently only available on Windows with melange SDK installed in contrib/Melange"
+		)
+	ENDIF ( MSVC )
+ENDIF (ASSIMP_BUILD_NONFREE_C4D_IMPORTER)
+
+
+
 ADD_SUBDIRECTORY( code/ )
 SET ( ASSIMP_BUILD_ASSIMP_TOOLS ON CACHE BOOL
 	"If the supplementary tools for Assimp are built in addition to the library."
@@ -166,6 +186,8 @@ ENDIF ( ASSIMP_BUILD_ASSIMP_TOOLS )
 SET ( ASSIMP_BUILD_SAMPLES OFF CACHE BOOL
 	"If the official samples are built as well (needs Glut)."
 )
+
+
 
 IF ( ASSIMP_BUILD_SAMPLES)
 	IF ( WIN32 )
