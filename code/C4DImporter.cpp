@@ -171,10 +171,11 @@ void C4DImporter::InternReadFile( const std::string& pFile,
 	std::copy(meshes.begin(), meshes.end(), pScene->mMeshes);
 
 	// copy materials over, adding a default material if necessary
-	const unsigned int mat_count = static_cast<unsigned int>(materials.size());
+	unsigned int mat_count = static_cast<unsigned int>(materials.size());
 	BOOST_FOREACH(aiMesh* mesh, meshes) {
 		ai_assert(mesh->mMaterialIndex <= mat_count);
 		if(mesh->mMaterialIndex >= mat_count) {
+			++mat_count;
 
 			ScopeGuard<aiMaterial> def_material(new aiMaterial());
 			const aiString name(AI_DEFAULT_MATERIAL_NAME);
