@@ -365,7 +365,9 @@ void C4DImporter::RecurseHierarchy(BaseObject* object, aiNode* parent)
 				meshes.push_back(mesh);
 			}
 		}
-
+		else {
+			LogWarn("ignoring object: " + std::string(GetObjectTypeName(type)));
+		}
 		
 		RecurseHierarchy(object->GetDown(), nd);
 		object = object->GetNext();
