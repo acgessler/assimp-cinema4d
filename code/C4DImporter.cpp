@@ -149,6 +149,9 @@ void C4DImporter::InternReadFile( const std::string& pFile,
 
 	pScene->mRootNode = new aiNode("<C4DRoot>");
 
+	// first convert all materials
+	ReadMaterials(doc->GetFirstMaterial());
+
 	// process C4D scenegraph recursively
 	try {
 		RecurseHierarchy(doc->GetFirstObject(), pScene->mRootNode);
@@ -241,6 +244,7 @@ bool C4DImporter::ReadShader(aiMaterial* out, _melange_::BaseShader* shader)
 		{
 			aiString path;
 			shader->GetFileName().GetString().GetCString(path.data, MAXLEN-1);
+			path.length = ::strlen(path.data);
 			out->AddProperty(&path, AI_MATKEY_TEXTURE_DIFFUSE(0));
 			return true;
 		}
@@ -263,10 +267,12 @@ void C4DImporter::ReadMaterials(_melange_::BaseMaterial* mat)
 		if (mat->GetType() == Mmaterial)
 		{
 			aiMaterial* out = new aiMaterial();
+			material_mapping[mat] = static_cast<unsigned int>(materials.size());
 			materials.push_back(out);
 
 			aiString ai_name;
 			name.GetCString(ai_name.data, MAXLEN-1);
+			ai_name.length = ::strlen(ai_name.data);
 			out->AddProperty(&ai_name, AI_MATKEY_NAME);
 
 			Material& m = dynamic_cast<Material&>(*mat);
@@ -288,7 +294,6 @@ void C4DImporter::ReadMaterials(_melange_::BaseMaterial* mat)
 				out->AddProperty(&v, 1, AI_MATKEY_COLOR_DIFFUSE);
 			}
 
-			
 			BaseShader* const shader = m.GetShader(MATERIAL_COLOR_SHADER);
 			if(shader) {
 				ReadShader(out, shader);
@@ -360,6 +365,7 @@ void C4DImporter::RecurseHierarchy(BaseObject* object, aiNode* parent)
 				meshes.push_back(mesh);
 			}
 		}
+
 		
 		RecurseHierarchy(object->GetDown(), nd);
 		object = object->GetNext();
