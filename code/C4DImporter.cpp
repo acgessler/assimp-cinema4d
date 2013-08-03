@@ -322,6 +322,7 @@ void C4DImporter::RecurseHierarchy(BaseObject* object, aiNode* parent)
 
 		aiString string;
 		name.GetCString(string.data, MAXLEN-1);
+		string.length = ::strlen(string.data);
 		aiNode* const nd = new aiNode();
 
 		nd->mParent = parent;
