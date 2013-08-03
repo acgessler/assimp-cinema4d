@@ -376,7 +376,7 @@ void C4DImporter::RecurseHierarchy(BaseObject* object, aiNode* parent)
 aiMesh* C4DImporter::ReadMesh(BaseObject* object)
 {
 	assert(object != NULL && object->GetType() == Opolygon);
-	
+
 	// based on Melange sample code
 	PolygonObject* const polyObject = dynamic_cast<PolygonObject*>(object);
 	ai_assert(polyObject != NULL);
@@ -420,9 +420,25 @@ aiMesh* C4DImporter::ReadMesh(BaseObject* object)
 
 	mesh->mNumVertices = vcount;
 	aiVector3D* verts = mesh->mVertices = new aiVector3D[mesh->mNumVertices];
+	aiVector3D* normals, *uvs;
 	unsigned int n = 0;
 
-	// copy vertices over and populate faces
+	// check if there are normals or UVW coordinates
+	BaseTag* tag = object->GetTag(Tnormal);
+	NormalTag* normals_src = NULL;
+	if(tag) {
+		normals_src = dynamic_cast<NormalTag*>(tag);
+		normals = mesh->mNormals = new aiVector3D[mesh->mNumVertices];
+	}
+
+	tag = object->GetTag(Tuvw);
+	UVWTag* uvs_src = NULL;
+	if(tag) {
+		uvs_src = dynamic_cast<UVWTag*>(tag);
+		uvs = mesh->mTextureCoords[0] = new aiVector3D[mesh->mNumVertices];
+	}
+
+	// copy vertices and extra channels over and populate faces
 	for (LONG i = 0; i < polyCount; ++i, ++face)
 	{
 		ai_assert(polys[i].a < pointCount && polys[i].a >= 0);
@@ -465,6 +481,60 @@ aiMesh* C4DImporter::ReadMesh(BaseObject* object)
 		face->mIndices = new unsigned int[face->mNumIndices];
 		for(unsigned int j = 0; j < face->mNumIndices; ++j) {
 			face->mIndices[j] = n++;
+		}
+
+		// copy normals
+		if (normals_src) {
+			const NormalStruct& nor = normals_src->GetNormals(i);
+			normals->x = nor.a.x;
+			normals->y = nor.a.y;
+			normals->z = nor.a.z;
+			++normals;
+
+			normals->x = nor.b.x;
+			normals->y = nor.b.y;
+			normals->z = nor.b.z;
+			++normals;
+
+			normals->x = nor.c.x;
+			normals->y = nor.c.y;
+			normals->z = nor.c.z;
+			++normals;
+
+			if(face->mNumIndices == 4) {
+				normals->x = nor.d.x;
+				normals->y = nor.d.y;
+				normals->z = nor.d.z;
+				++normals;
+			}
+		}
+
+		// copy UVs
+		if (uvs_src) {
+			UVWStruct uvw;
+			uvs_src->Get(uvs_src->GetDataAddressR(),i,uvw);
+
+			uvs->x = uvw.a.x;
+			uvs->y = uvw.a.y;
+			uvs->z = uvw.a.z;
+			++uvs;
+
+			uvs->x = uvw.b.x;
+			uvs->y = uvw.b.y;
+			uvs->z = uvw.b.z;
+			++uvs;
+
+			uvs->x = uvw.c.x;
+			uvs->y = uvw.c.y;
+			uvs->z = uvw.c.z;
+			++uvs;
+
+			if(face->mNumIndices == 4) {
+				uvs->x = uvw.d.x;
+				uvs->y = uvw.d.y;
+				uvs->z = uvw.d.z;
+				++uvs;
+			}
 		}
 	}
 
