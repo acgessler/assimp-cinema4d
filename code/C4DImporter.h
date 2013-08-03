@@ -55,6 +55,7 @@ namespace _melange_ {
 	class BaseObject; // c4d_file.h
 	class PolygonObject;
 	class BaseMaterial;
+	class BaseShader;
 }
 
 namespace Assimp	{
@@ -103,6 +104,8 @@ private:
 	void RecurseHierarchy(_melange_::BaseObject* object, aiNode* parent);
 	aiMesh* ReadMesh(_melange_::BaseObject* object);
 	unsigned int ResolveMaterial(_melange_::PolygonObject* obj);
+
+	bool ReadShader(aiMaterial* out, _melange_::BaseShader* shader);
 
 	std::vector<aiMesh*> meshes;
 	std::vector<aiMaterial*> materials;

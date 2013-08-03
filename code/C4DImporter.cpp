@@ -189,6 +189,71 @@ void C4DImporter::InternReadFile( const std::string& pFile,
 
 
 // ------------------------------------------------------------------------------------------------
+bool C4DImporter::ReadShader(aiMaterial* out, _melange_::BaseShader* shader) 
+{
+	// based on Melange sample code (C4DImportExport.cpp)
+	while(shader) {
+		if(shader->GetType() == Xlayer) {
+			BaseContainer* container = shader->GetDataInstance();
+			GeData blend = container->GetData(SLA_LAYER_BLEND);
+			iBlendDataType* blend_list = reinterpret_cast<iBlendDataType*>(blend.GetCustomDataType(CUSTOMDATA_BLEND_LIST));
+			if (!blend_list)
+			{
+				LogWarn("ignoring XLayer shader: no blend list given");
+				continue;
+			}
+
+			LayerShaderLayer *lsl = dynamic_cast<LayerShaderLayer*>(blend_list->m_BlendLayers.GetObject(0));
+
+			// Ignore the actual layer blending - models for real-time rendering should not
+			// use them in a non-trivial way. Just try to find textures that we can apply
+			// to the model.
+			while (lsl)
+			{
+				if (lsl->GetType() == TypeFolder)
+				{
+					BlendFolder* const folder = dynamic_cast<BlendFolder*>(lsl); 
+					LayerShaderLayer *subLsl = dynamic_cast<LayerShaderLayer*>(folder->m_Children.GetObject(0));
+
+					while (subLsl)
+					{
+						if (subLsl->GetType() == TypeShader) {
+							BlendShader* const shader = dynamic_cast<BlendShader*>(subLsl); 
+							if(ReadShader(out, static_cast<BaseShader*>(shader->m_pLink->GetLink()))) {
+								return true;
+							}
+						}
+
+						subLsl = subLsl->GetNext();
+					}
+				}
+				else if (lsl->GetType() == TypeShader) {
+					BlendShader* const shader = dynamic_cast<BlendShader*>(lsl); 
+					if(ReadShader(out, static_cast<BaseShader*>(shader->m_pLink->GetLink()))) {
+						return true;
+					}
+				}
+
+				lsl = lsl->GetNext();	
+			}
+		}
+		else if ( shader->GetType() == Xbitmap )
+		{
+			aiString path;
+			shader->GetFileName().GetString().GetCString(path.data, MAXLEN-1);
+			out->AddProperty(&path, AI_MATKEY_TEXTURE_DIFFUSE(0));
+			return true;
+		}
+		else {
+			LogWarn("ignoring shader type: " + std::string(GetObjectTypeName(shader->GetType())));
+		}
+		shader = shader->GetNext();
+	}
+	return false;
+}
+
+
+// ------------------------------------------------------------------------------------------------
 void C4DImporter::ReadMaterials(_melange_::BaseMaterial* mat)
 {
 	// based on Melange sample code
@@ -223,11 +288,15 @@ void C4DImporter::ReadMaterials(_melange_::BaseMaterial* mat)
 				out->AddProperty(&v, 1, AI_MATKEY_COLOR_DIFFUSE);
 			}
 
-			// TODO: handle textures and more material properties
+			
+			BaseShader* const shader = m.GetShader(MATERIAL_COLOR_SHADER);
+			if(shader) {
+				ReadShader(out, shader);
+			}
 		}
 		else
 		{
-			LogWarn("ignoring plugin material");
+			LogWarn("ignoring plugin material: " + std::string(GetObjectTypeName(mat->GetType())));
 		}
 		mat = mat->GetNext();
 	}
