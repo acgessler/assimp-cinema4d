@@ -430,15 +430,23 @@ aiMesh* C4DImporter::ReadMesh(BaseObject* object)
 
 	mesh->mNumVertices = vcount;
 	aiVector3D* verts = mesh->mVertices = new aiVector3D[mesh->mNumVertices];
-	aiVector3D* normals, *uvs;
+	aiVector3D* normals, *uvs, *tangents, *bitangents;
 	unsigned int n = 0;
 
-	// check if there are normals or UVW coordinates
+	// check if there are normals, tangents or UVW coordinates
 	BaseTag* tag = object->GetTag(Tnormal);
 	NormalTag* normals_src = NULL;
 	if(tag) {
 		normals_src = dynamic_cast<NormalTag*>(tag);
 		normals = mesh->mNormals = new aiVector3D[mesh->mNumVertices];
+	}
+
+	tag = object->GetTag(Ttangent);
+	TangentTag* tangents_src = NULL;
+	if(tag) {
+		tangents_src = dynamic_cast<TangentTag*>(tag);
+		tangents = mesh->mTangents = new aiVector3D[mesh->mNumVertices];
+		bitangents = mesh->mBitangents = new aiVector3D[mesh->mNumVertices];
 	}
 
 	tag = object->GetTag(Tuvw);
@@ -516,6 +524,40 @@ aiMesh* C4DImporter::ReadMesh(BaseObject* object)
 				normals->y = nor.d.y;
 				normals->z = nor.d.z;
 				++normals;
+			}
+		}
+
+		// copy tangents and bitangents
+		if (tangents_src) {
+			
+			for(unsigned int k = 0; k < face->mNumIndices; ++k) {
+				LONG l;
+				switch(k) {
+				case 0:
+					l = polys[i].a;
+					break;
+				case 1:
+					l = polys[i].b;
+					break;
+				case 2:
+					l = polys[i].c;
+					break;
+				case 3:
+					l = polys[i].d;
+					break;
+				default:
+					ai_assert(false);
+				}
+				Tangent tan = tangents_src->GetDataR()[l];
+				tangents->x = tan.vl.x;
+				tangents->y = tan.vl.y;
+				tangents->z = tan.vl.z;
+				++tangents;
+
+				bitangents->x = tan.vr.x;
+				bitangents->y = tan.vr.y;
+				bitangents->z = tan.vr.z;
+				++bitangents;
 			}
 		}
 
