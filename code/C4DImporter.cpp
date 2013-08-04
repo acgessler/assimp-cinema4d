@@ -438,22 +438,22 @@ aiMesh* C4DImporter::ReadMesh(BaseObject* object)
 	NormalTag* normals_src = NULL;
 	if(tag) {
 		normals_src = dynamic_cast<NormalTag*>(tag);
-		normals = mesh->mNormals = new aiVector3D[mesh->mNumVertices];
+		normals = mesh->mNormals = new aiVector3D[mesh->mNumVertices]();
 	}
 
 	tag = object->GetTag(Ttangent);
 	TangentTag* tangents_src = NULL;
 	if(tag) {
 		tangents_src = dynamic_cast<TangentTag*>(tag);
-		tangents = mesh->mTangents = new aiVector3D[mesh->mNumVertices];
-		bitangents = mesh->mBitangents = new aiVector3D[mesh->mNumVertices];
+		tangents = mesh->mTangents = new aiVector3D[mesh->mNumVertices]();
+		bitangents = mesh->mBitangents = new aiVector3D[mesh->mNumVertices]();
 	}
 
 	tag = object->GetTag(Tuvw);
 	UVWTag* uvs_src = NULL;
 	if(tag) {
 		uvs_src = dynamic_cast<UVWTag*>(tag);
-		uvs = mesh->mTextureCoords[0] = new aiVector3D[mesh->mNumVertices];
+		uvs = mesh->mTextureCoords[0] = new aiVector3D[mesh->mNumVertices]();
 	}
 
 	// copy vertices and extra channels over and populate faces
@@ -503,27 +503,32 @@ aiMesh* C4DImporter::ReadMesh(BaseObject* object)
 
 		// copy normals
 		if (normals_src) {
-			const NormalStruct& nor = normals_src->GetNormals(i);
-			normals->x = nor.a.x;
-			normals->y = nor.a.y;
-			normals->z = nor.a.z;
-			++normals;
-
-			normals->x = nor.b.x;
-			normals->y = nor.b.y;
-			normals->z = nor.b.z;
-			++normals;
-
-			normals->x = nor.c.x;
-			normals->y = nor.c.y;
-			normals->z = nor.c.z;
-			++normals;
-
-			if(face->mNumIndices == 4) {
-				normals->x = nor.d.x;
-				normals->y = nor.d.y;
-				normals->z = nor.d.z;
+			if(i >= normals_src->GetNormalCount()) {
+				LogError("unexpected number of normals, ignoring");
+			}
+			else {
+				const NormalStruct& nor = normals_src->GetNormals(i);
+				normals->x = nor.a.x;
+				normals->y = nor.a.y;
+				normals->z = nor.a.z;
 				++normals;
+
+				normals->x = nor.b.x;
+				normals->y = nor.b.y;
+				normals->z = nor.b.z;
+				++normals;
+
+				normals->x = nor.c.x;
+				normals->y = nor.c.y;
+				normals->z = nor.c.z;
+				++normals;
+
+				if(face->mNumIndices == 4) {
+					normals->x = nor.d.x;
+					normals->y = nor.d.y;
+					normals->z = nor.d.z;
+					++normals;
+				}
 			}
 		}
 
@@ -548,6 +553,11 @@ aiMesh* C4DImporter::ReadMesh(BaseObject* object)
 				default:
 					ai_assert(false);
 				}
+				if(l >= tangents_src->GetDataCount()) {
+					LogError("unexpected number of tangents, ignoring");
+					break;
+				}
+
 				Tangent tan = tangents_src->GetDataR()[l];
 				tangents->x = tan.vl.x;
 				tangents->y = tan.vl.y;
@@ -563,29 +573,34 @@ aiMesh* C4DImporter::ReadMesh(BaseObject* object)
 
 		// copy UVs
 		if (uvs_src) {
-			UVWStruct uvw;
-			uvs_src->Get(uvs_src->GetDataAddressR(),i,uvw);
+			if(i >= uvs_src->GetDataCount()) {
+				LogError("unexpected number of UV coordinates, ignoring");
+			}
+			else {
+				UVWStruct uvw;
+				uvs_src->Get(uvs_src->GetDataAddressR(),i,uvw);
 
-			uvs->x = uvw.a.x;
-			uvs->y = 1.0f-uvw.a.y;
-			uvs->z = uvw.a.z;
-			++uvs;
-
-			uvs->x = uvw.b.x;
-			uvs->y = 1.0f-uvw.b.y;
-			uvs->z = uvw.b.z;
-			++uvs;
-
-			uvs->x = uvw.c.x;
-			uvs->y = 1.0f-uvw.c.y;
-			uvs->z = uvw.c.z;
-			++uvs;
-
-			if(face->mNumIndices == 4) {
-				uvs->x = uvw.d.x;
-				uvs->y = 1.0f-uvw.d.y;
-				uvs->z = uvw.d.z;
+				uvs->x = uvw.a.x;
+				uvs->y = 1.0f-uvw.a.y;
+				uvs->z = uvw.a.z;
 				++uvs;
+
+				uvs->x = uvw.b.x;
+				uvs->y = 1.0f-uvw.b.y;
+				uvs->z = uvw.b.z;
+				++uvs;
+
+				uvs->x = uvw.c.x;
+				uvs->y = 1.0f-uvw.c.y;
+				uvs->z = uvw.c.z;
+				++uvs;
+
+				if(face->mNumIndices == 4) {
+					uvs->x = uvw.d.x;
+					uvs->y = 1.0f-uvw.d.y;
+					uvs->z = uvw.d.z;
+					++uvs;
+				}
 			}
 		}
 	}
