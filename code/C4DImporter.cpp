@@ -53,6 +53,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "C4DImporter.h"
 #include "TinyFormatter.h"
 
+#if defined(_M_X64) || defined(__amd64__)
+#	define __C4D_64BIT
+#endif
+
 #define __PC 
 #include "c4d_file.h"
 #include "default_alien_overloads.h"
